@@ -14,8 +14,9 @@ async function createConsultation(req, res, next) {
 
 async function listConsultations(req, res, next) {
   try {
-    const consultations = await consultationService.listConsultationsForUser(req.user);
-    res.status(200).json({ consultations });
+    const { page, limit } = req.query;
+    const result = await consultationService.listConsultationsForUser(req.user, { page, limit });
+    res.status(200).json(result); // { consultations, pagination }
   } catch (err) {
     next(err);
   }
