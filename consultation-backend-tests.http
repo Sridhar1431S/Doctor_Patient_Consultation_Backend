@@ -1,0 +1,223 @@
+### ============================================
+### Doctor-Patient Consultation Backend — API Tests
+### Install the "REST Client" extension by Huachao Mao first.
+### Then click "Send Request" above each block below, IN ORDER.
+### After Login requests, copy the token from the response into
+### the @patientToken / @doctorToken variables below.
+### ============================================
+
+@baseUrl = http://localhost:4000
+@patientToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6Miwicm9sZSI6IlBBVElFTlQiLCJpYXQiOjE3ODQwMjQ0MzAsImV4cCI6MTc4NDExMDgzMH0.In7g7pOGy9i1gNpRojKTKZft95eMmE45CEUp3T12ev4
+@doctorToken = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6MSwicm9sZSI6IkRPQ1RPUiIsImlhdCI6MTc4NDAyNDM4MCwiZXhwIjoxNzg0MTEwNzgwfQ.4ZuJWI2lu7t2xLS6PIxlVVCwisvPQLr_IDk-rlcIQRQ
+@doctorProfileId = 1
+@consultationId = 1
+
+
+### ---------- 1. AUTH ----------
+
+### Register Doctor
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Dr. Rao",
+  "email": "rao@test.com",
+  "password": "pass123",
+  "role": "DOCTOR",
+  "specialization": "Cardiology",
+  "experienceYears": 5
+}
+
+### Register Patient
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Sridhar",
+  "email": "sridhar@test.com",
+  "password": "pass123",
+  "role": "PATIENT"
+}
+
+### Register - Duplicate Email (expect 409)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Sridhar Again",
+  "email": "sridhar@test.com",
+  "password": "pass123",
+  "role": "PATIENT"
+}
+
+### Register - Invalid Email (expect 400)
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "name": "Bad Email",
+  "email": "not-an-email",
+  "password": "pass123",
+  "role": "PATIENT"
+}
+
+### Login Doctor — COPY the "token" value from the response into @doctorToken above
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "rao@test.com",
+  "password": "pass123"
+}
+
+### Login Patient — COPY the "token" value from the response into @patientToken above
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "sridhar@test.com",
+  "password": "pass123"
+}
+
+### Login - Wrong Password (expect 401)
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "sridhar@test.com",
+  "password": "wrongpass"
+}
+
+### Get Profile (Patient) — requires @patientToken to be set above
+GET {{baseUrl}}/profile
+Authorization: Bearer {{patientToken}}
+
+### Get Profile - No Token (expect 401)
+GET {{baseUrl}}/profile
+
+
+### ---------- 2. DOCTORS ----------
+
+### List Doctors — note the "id" in the response, put it in @doctorProfileId above
+GET {{baseUrl}}/doctors
+Authorization: Bearer {{patientToken}}
+
+### Get Doctor By Id
+GET {{baseUrl}}/doctors/{{doctorProfileId}}
+Authorization: Bearer {{patientToken}}
+
+### Get Doctor - Not Found (expect 404)
+GET {{baseUrl}}/doctors/99999
+Authorization: Bearer {{patientToken}}
+
+
+### ---------- 3. CONSULTATIONS ----------
+
+### Create Consultation (Patient) — note the "id" in the response, put it in @consultationId above
+POST {{baseUrl}}/consultations
+Content-Type: application/json
+Authorization: Bearer {{patientToken}}
+
+{
+  "doctorId": {{doctorProfileId}}
+}
+
+### Create Consultation - As Doctor (expect 403)
+POST {{baseUrl}}/consultations
+Content-Type: application/json
+Authorization: Bearer {{doctorToken}}
+
+{
+  "doctorId": {{doctorProfileId}}
+}
+
+### List My Consultations (Patient)
+GET {{baseUrl}}/consultations
+Authorization: Bearer {{patientToken}}
+
+### List My Consultations (Doctor)
+GET {{baseUrl}}/consultations
+Authorization: Bearer {{doctorToken}}
+
+### Get Consultation By Id
+GET {{baseUrl}}/consultations/{{consultationId}}
+Authorization: Bearer {{patientToken}}
+
+### Send Message Before Active (expect 400)
+POST {{baseUrl}}/consultations/{{consultationId}}/messages
+Content-Type: application/json
+Authorization: Bearer {{patientToken}}
+
+{
+  "content": "Hello doctor, are you there?"
+}
+
+### Update Status to ACTIVE (Doctor)
+PATCH {{baseUrl}}/consultations/{{consultationId}}/status
+Content-Type: application/json
+Authorization: Bearer {{doctorToken}}
+
+{
+  "status": "ACTIVE"
+}
+
+### Update Status - As Patient (expect 403)
+PATCH {{baseUrl}}/consultations/{{consultationId}}/status
+Content-Type: application/json
+Authorization: Bearer {{patientToken}}
+
+{
+  "status": "COMPLETED"
+}
+
+
+### ---------- 4. MESSAGES ----------
+
+### Send Message (Patient)
+POST {{baseUrl}}/consultations/{{consultationId}}/messages
+Content-Type: application/json
+Authorization: Bearer {{patientToken}}
+
+{
+  "content": "Hello doctor, I have a headache."
+}
+
+### Send Message (Doctor)
+POST {{baseUrl}}/consultations/{{consultationId}}/messages
+Content-Type: application/json
+Authorization: Bearer {{doctorToken}}
+
+{
+  "content": "How long have you had it?"
+}
+
+### List Messages (chronological order)
+GET {{baseUrl}}/consultations/{{consultationId}}/messages
+Authorization: Bearer {{patientToken}}
+
+### Complete Consultation (Doctor)
+PATCH {{baseUrl}}/consultations/{{consultationId}}/status
+Content-Type: application/json
+Authorization: Bearer {{doctorToken}}
+
+{
+  "status": "COMPLETED"
+}
+
+### Send Message After Completed (expect 400)
+POST {{baseUrl}}/consultations/{{consultationId}}/messages
+Content-Type: application/json
+Authorization: Bearer {{patientToken}}
+
+{
+  "content": "One more thing..."
+}
+
+### Update Status After Completed (expect 400)
+PATCH {{baseUrl}}/consultations/{{consultationId}}/status
+Content-Type: application/json
+Authorization: Bearer {{doctorToken}}
+
+{
+  "status": "ACTIVE"
+}

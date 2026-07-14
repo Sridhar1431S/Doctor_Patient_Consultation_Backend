@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  PATIENT
+  DOCTOR
+}
+
+enum ConsultationStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+  createdAt DateTime @default(now())
+
+  doctorProfile           DoctorProfile?
+  consultationsAsPatient  Consultation[]  @relation("PatientConsultations")
+  messages                Message[]
+}
+
+model DoctorProfile {
+  id              Int    @id @default(autoincrement())
+  userId          Int    @unique
+  specialization  String
+  experienceYears Int
+
+  user                  User           @relation(fields: [userId], references: [id])
+  consultationsAsDoctor Consultation[] @relation("DoctorConsultations")
+}
+
+model Consultation {
+  id        Int                @id @default(autoincrement())
+  patientId Int
+  doctorId  Int
+  status    ConsultationStatus @default(PENDING)
+  createdAt DateTime           @default(now())
+
+  patient  User          @relation("PatientConsultations", fields: [patientId], references: [id])
+  doctor   DoctorProfile @relation("DoctorConsultations", fields: [doctorId], references: [id])
+  messages Message[]
+}
+
+model Message {
+  id             Int      @id @default(autoincrement())
+  consultationId Int
+  senderId       Int
+  content        String
+  createdAt      DateTime @default(now())
+
+  consultation Consultation @relation(fields: [consultationId], references: [id])
+  sender       User         @relation(fields: [senderId], references: [id])
+}
