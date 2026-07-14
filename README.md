@@ -173,6 +173,7 @@ Headers: Authorization: Bearer <token>
 ```
 
 ## Assumptions
+- `GET /consultations` supports `?page=` and `?limit=` query params (default page=1, limit=10, max limit=50) and returns a `pagination` object alongside `consultations`.
 
 - Doctor-specific fields (`specialization`, `experienceYears`) are supplied at registration time in the same request.
 - Status transitions are enforced strictly in order: PENDING → ACTIVE → COMPLETED, no skipping.
