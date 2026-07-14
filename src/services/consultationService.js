@@ -26,22 +26,50 @@ async function createConsultation(patientId, doctorId) {
   });
 }
 
-async function listConsultationsForUser(user) {
+async function listConsultationsForUser(user, { page = 1, limit = 10 } = {}) {
+  // Guard against garbage query params (e.g. ?page=abc or ?limit=-5).
+  const pageNum = Math.max(1, Number(page) || 1);
+  const limitNum = Math.min(50, Math.max(1, Number(limit) || 10)); // cap at 50 per page
+  const skip = (pageNum - 1) * limitNum;
+
+  let where;
   if (user.role === 'PATIENT') {
-    return prisma.consultation.findMany({
-      where: { patientId: user.id },
-      include: { doctor: { include: { user: { select: { name: true } } } } },
-    });
+    where = { patientId: user.id };
+  } else {
+    // DOCTOR: find their doctorProfile first, then filter consultations by it.
+    const doctorProfile = await prisma.doctorProfile.findUnique({ where: { userId: user.id } });
+    if (!doctorProfile) {
+      return { consultations: [], pagination: { page: pageNum, limit: limitNum, total: 0, totalPages: 0 } };
+    }
+    where = { doctorId: doctorProfile.id };
   }
 
-  // DOCTOR: find their doctorProfile first, then filter consultations by it.
-  const doctorProfile = await prisma.doctorProfile.findUnique({ where: { userId: user.id } });
-  if (!doctorProfile) return [];
+  const include =
+    user.role === 'PATIENT'
+      ? { doctor: { include: { user: { select: { name: true } } } } }
+      : { patient: { select: { name: true } } };
 
-  return prisma.consultation.findMany({
-    where: { doctorId: doctorProfile.id },
-    include: { patient: { select: { name: true } } },
-  });
+  // Run the page query and the total count together.
+  const [consultations, total] = await Promise.all([
+    prisma.consultation.findMany({
+      where,
+      include,
+      skip,
+      take: limitNum,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.consultation.count({ where }),
+  ]);
+
+  return {
+    consultations,
+    pagination: {
+      page: pageNum,
+      limit: limitNum,
+      total,
+      totalPages: Math.ceil(total / limitNum),
+    },
+  };
 }
 
 // Shared helper — also used by messageService, which is why it lives here
